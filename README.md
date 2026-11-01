@@ -100,22 +100,6 @@ CLNet 式在 437 bit 下码字 NMSE 为 −2.6 dB，此时 RZF 比 MRT 低 53.9%
 **学习波束**在 150 个快照上，纯网络方案和速率 18.13（p5 0.198），优于固定簇 MRT 与 RZF，
 低于迭代优化；"学习初始化 + PG40"组合达到 36.62，是本批次最高值。
 
-## 工程实践
-
-评测链路的正确性比模型结构更值得记录。
-
-- 候选编号必须与信道同序。读取批次时，信道张量、候选索引、服务集、码字张量需要用同一个
-  排序一起搬运。早期版本只排序索引而没有同步信道，恒等自检照样通过，但绝对 SE 低了约 2.4 倍，
-  RZF 与 MRT 的相对强弱也被打乱。
-- 恒等自检作为硬门禁。把码字直接当真实信道时，NMSE 需低于 −140 dB，且 `recon` 与 `perfect`
-  的 SE 必须逐位相同，否则不产出结论。
-- 码字量化要插在 encode 与 decode 之间。评测脚本直接调用这两个方法，写在模型 `forward`
-  里的量化不会生效，表现为量化前后结果一致。
-- 射线数据的缺失径用 NaN 填充（约 50%），必须显式清洗；否则整张信道矩阵变成 NaN，
-  而下游只会安静地算出空结果。
-- 模型学不动时先量容量上限。多尺度并行的编码器曾精确落在秩 d 线性投影的上限，
-  原因是分支内没有非线性，末端的激活又把 2 通道瓶颈截断为非负。
-
 ## 目录结构
 
 ```
@@ -133,45 +117,24 @@ ai-ucf-csi/
 │   └── feedback/quantize.py             功率量化
 ├── scripts/                    训练批处理、评测矩阵、统计、画图、诊断
 ├── tests/                      6 个可独立运行的验收自检
-└── docs/                       口径、结果、复现与图
+└── docs/                       结果、系统级对比、运行方式与图
 ```
 
 ## 复现
 
-依赖 Python 3.11、PyTorch、numpy、scipy、matplotlib。数据集需从 DeepMIMO 官网获取。
-
 ```bash
-# 1. 射线数据转成本项目格式（合成 4 天线 ULA，约 1 分钟）
-python src/data/adapters/deepmimo_rays.py --zip deepmimo_scenarios/o1_3p5.zip \
-    --out data/deepmimo_o1_r18 --ap-count 18 --ue-count 18 --candidates 6 --serving 3
+# 数据适配（射线合成 4 天线 ULA）
+python src/data/adapters/deepmimo_rays.py --zip deepmimo_scenarios/o1_3p5.zip     --out data/deepmimo_o1_r18 --ap-count 18 --ue-count 18 --candidates 6 --serving 3
+python src/data/dataset.py --config configs/cf_r18_deepmimo.yaml     --data-dir data/deepmimo_o1_r18 --build
 
-# 2. 派生数据与门禁
-python src/data/dataset.py --config configs/cf_r18_deepmimo.yaml \
-    --data-dir data/deepmimo_o1_r18 --build
-
-# 3. 训练四个骨干
-python scripts/train_zoo.py --data-dir data/deepmimo_o1_r18 \
-    --archs clnet,csinet,crnet,acrnet --dims 8,32 --seeds 0,1,2,3,4,5
-
-# 4. 评测矩阵与配对统计
-python scripts/zoo_matrix.py --ckpt-root runs --config configs/cf_r18_deepmimo.yaml \
-    --data-dir data/deepmimo_o1_r18 --kappas 1,16
+# 训练与评测
+python scripts/train_zoo.py --data-dir data/deepmimo_o1_r18     --archs clnet,csinet,crnet,acrnet --dims 8,32 --seeds 0,1,2,3,4,5
+python scripts/zoo_matrix.py --ckpt-root runs --config configs/cf_r18_deepmimo.yaml     --data-dir data/deepmimo_o1_r18 --kappas 1,16
 python scripts/zoo_stats.py --csv runs/zoo-matrix/matrix.csv
-
-# 5. 出图
-python scripts/fig_csi_feedback.py --csv runs/zoo-matrix/matrix.csv --outdir docs/figures
 ```
 
-验收自检可以直接运行，退出码为 0 即通过：
-
-```bash
-for t in tests/test_{csi_codec,generate_cf,precoding,precoding_rzf,power,interference_scope}.py; do
-    python "$t" || echo "FAILED $t"
-done
-```
-
-口径说明见 [docs/系统与口径.md](docs/系统与口径.md)，完整数字与统计见
-[docs/结果与统计.md](docs/结果与统计.md)，复现细节见 [docs/复现.md](docs/复现.md)。
+其余命令、参数与诊断脚本见 [docs/复现.md](docs/复现.md)；结果与统计见
+[docs/结果与统计.md](docs/结果与统计.md)。
 
 ## 结论的边界
 
