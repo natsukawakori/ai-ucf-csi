@@ -1,0 +1,27 @@
+# 统一换行符，避免 Windows/Linux 协作时的噪音 diff
+* text=auto
+
+*.py   text eol=lf
+*.md   text eol=lf
+*.yaml text eol=lf
+*.yml  text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+*.sh   text eol=lf
+
+*.ps1  text eol=crlf
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+
+*.tex  text eol=lf
+*.bib  text eol=lf
+
+# 二进制文件不做换行转换
+*.png  binary
+*.jpg  binary
+*.pdf  binary
+*.pt   binary
+*.pth  binary
+*.npy  binary
+*.mat  binary
+*.h5   binary

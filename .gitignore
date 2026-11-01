@@ -1,0 +1,58 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.ipynb_checkpoints/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---- 数据与实验产物（不进版本库）----
+# 注意：必须写 /data/ 而不是 data/，否则会连带忽略 src/data/ 代码目录。
+/data/
+/datasets/
+/deepmimo_scenarios/
+*.npy
+*.npz
+*.h5
+*.hdf5
+*.mat
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.pkl
+*.joblib
+*.parquet
+
+/runs/
+/outputs/
+/logs/
+*.log
+*.csv
+
+# ---- 本机配置与密钥 ----
+.env
+*.key
+token.txt
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+*~
+
+# ---- LaTeX 中间产物 ----
+*.aux
+*.bbl
+*.blg
+*.out
+*.synctex.gz
+*.toc
+*.fls
+*.fdb_latexmk

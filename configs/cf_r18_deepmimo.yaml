@@ -1,0 +1,93 @@
+# =============================================================================
+# 真实数据（DeepMIMO O1_3p5）**结果口径**：L=18, K=18, M=6, S=3
+#
+# 使用全部18站，UE仅来自RX_1主街，有效参与服务约12站。
+# 名义负载 K*S/L=3；按12站粗估约4.5。Na=4由射线合成ULA。
+# 真实空间切分及1200/200/200快照以manifest.adapter.json为准。
+#
+# 与合成配置的区别只在 system 段；data 段保留占位（真实数据由
+# src/data/adapters/deepmimo_rays.py 产出，不经过合成生成器）。
+# =============================================================================
+
+project_version: v2.0
+seed: 0
+
+system:
+  duplex: FDD
+  processing: centralized_cpu_user_centric
+
+  ap_count: 18
+  ue_count: 18
+  antennas_per_ap: 4
+  subcarriers: 32
+
+  candidate_count: 6
+  serving_count: 3
+  candidate_policy: ideal_beta_top_m
+  shuffle_candidate_order: true
+
+  feedback_scope: all_candidates
+  precoder: mrt
+
+  power_per_ap_w: 0.1
+  bandwidth_hz: 10000000
+  noise_figure_db: 7
+  feedback_period_ms: 20
+
+data:
+  train_scenes: 100
+  val_scenes: 16
+  test_scenes: 30
+  snapshots_per_scene: 5
+  split_by: scene_id
+
+  pathloss_model: "ray-tracing (DeepMIMO O1_3p5)"
+  shadowing_std_db: 0.0
+  resample_shadowing_per_scene: false
+  area_m: [600, 600]
+  ap_height_m: 6.0
+  ue_height_m: 1.5
+  min_distance_m: 5.0
+  carrier_hz: 3.5e9
+  path_count: 18
+  delay_spread_s: 0.5e-6
+  decay_constant_s: 0.15e-6
+
+  label_snapshots: 400
+
+model:
+  input_domain: antenna_frequency
+  share_codec_across_aps: true
+  latent_dim: 8
+  ap_head_hidden: [32, 16]
+  use_power_feature: true
+  use_global_user_feature: false
+  output_activation: linear
+
+feedback:
+  latent_bits: 8
+  power_bits: 8
+  power_quant_range_db: [-125, -52]
+  quantization: post_training_uniform
+  calibration_split: train
+
+train:
+  batch_users: 8
+  max_epochs: 150
+  optimizer: adam
+  learning_rate: 0.003
+  head_epochs: 15
+  head_learning_rate: 0.001
+  lambda_ap: 0.1
+  precision: fp32_first_then_profile_amp
+  use_pcgrad: false
+  early_stop_patience: 20
+
+evaluation:
+  cluster_periods: [1, 5, 10, 20]
+  power_window: 1
+  temporal_rho: 0.99
+  sequence_length: 200
+  sequence_scenes: 20
+  enforce_interference_check: true
+  report_fairness: true

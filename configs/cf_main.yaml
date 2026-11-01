@@ -1,0 +1,99 @@
+# =============================================================================
+# 主实验配置（研究手册 v2.0 §11.2）
+#
+# ⚠️ 关键约束：K * S >= 2 * L
+#    L=8, K=8, S=2  ->  K*S = 16 = 2L  ✔
+#    若改成 K=4，则 K*S = 8 = L，干扰项恒为空，AP 选择问题退化，
+#    第三步核心实验将无法区分任何方法。详见手册 §0.1 阻塞项 B1。
+# =============================================================================
+
+project_version: v2.0
+seed: 0
+
+system:
+  duplex: FDD
+  processing: centralized_cpu_user_centric
+
+  ap_count: 8
+  ue_count: 8                  # v2.0：由 v1.0 的 4 改为 8，见上面的约束
+  antennas_per_ap: 4
+  subcarriers: 32
+
+  candidate_count: 4           # M
+  serving_count: 2             # S
+  candidate_policy: ideal_beta_top_m
+  shuffle_candidate_order: true   # 必须：防止"候选序号编码 beta 排名"的捷径 (S2)
+
+  feedback_scope: all_candidates
+  precoder: mrt
+
+  power_per_ap_w: 0.1
+  bandwidth_hz: 10000000
+  noise_figure_db: 7
+  feedback_period_ms: 20       # 用于把反馈位数换算成速率
+
+data:
+  train_scenes: 400
+  val_scenes: 80
+  test_scenes: 100
+  snapshots_per_scene: 10
+  split_by: scene_id
+
+  # ---- 信道模型：自定义合成模型，非 3GPP 标准模型 ----
+  pathloss_model: "40+30log10(d)"     # 斜率 30 dB/decade ≈ 自由空间；NLOS 偏乐观
+  shadowing_std_db: 4.0
+  resample_shadowing_per_scene: true  # 必须：防止验证/测试集共享训练集的大尺度实现 (S7)
+  area_m: [200, 200]
+  ap_height_m: 6.0
+  ue_height_m: 1.5
+  min_distance_m: 5.0
+  carrier_hz: 3.5e9
+  path_count: 4
+  delay_spread_s: 0.5e-6              # 0—0.5 微秒均匀分布后排序
+  decay_constant_s: 0.15e-6
+  # 注意：10 MHz / 32 子载波的时延分辨率为 100 ns，
+  #       信道在此网格上近似平坦，不具备角延迟域稀疏性（手册 §5.1）
+
+  # 训练集 400 场景 x 10 快照 = 4000 快照（标签搜索只能用这部分，不能用测试集）
+  label_snapshots: 4000
+
+model:
+  input_domain: antenna_frequency      # 首版不做 DFT；理由见手册 §5.4
+  share_codec_across_aps: true
+  latent_dim: 32                       # 实数维。若按复数维算，B_UL 会翻倍 (G3)
+  ap_head_hidden: [32, 16]
+  use_power_feature: true
+  use_global_user_feature: false       # 可选变体 V1（跨用户全局特征池化）(S5)
+  output_activation: linear            # 归一化改为有正有负后，不能用原 CLNet 的 [0,1] 硬 Sigmoid
+
+feedback:
+  latent_bits: 8                       # q
+  power_bits: 8                        # q_p
+  # 量化范围按训练集功率分布（约 -120 ~ -53 dB）收紧：原 [-180, -47] 的
+  # 133 dB 跨度中仅使用 68 dB，浪费约一倍分辨率。收紧后 8 bit 功率量化 NMSE
+  # 由 -29.9 dB 改善至 -35.9 dB（零饱和），优于码字本身，因此显式回传功率
+  # 不是瓶颈；保留少量余量以覆盖测试集极值。
+  power_quant_range_db: [-125, -52]
+  quantization: post_training_uniform
+  calibration_split: train             # 量化范围只用训练集校准，测试时只加载不重拟
+
+train:
+  batch_users: 8                       # RTX 3050 Laptop 4 GB：从 4—8 起，不要从 16 起 (S1)
+  max_epochs: 100
+  optimizer: adam
+  learning_rate: 0.001
+  head_epochs: 15                      # 先冻结编解码器只训 AP 头
+  head_learning_rate: 0.001
+  lambda_ap: 0.1                       # 候选 0.01 / 0.1 / 1，先用验证集选定
+  precision: fp32_first_then_profile_amp
+  use_pcgrad: false                    # 仅在测到明确负迁移后才考虑 (S4)
+  early_stop_patience: 20
+
+evaluation:
+  cluster_periods: [1, 5, 10, 20]      # 第四步扫描，不需要为每个 T 重训
+  power_window: 1                      # W
+  temporal_rho: 0.99
+  sequence_length: 200
+  sequence_scenes: 20
+  enforce_interference_check: true     # 强制 K*S >= 2L 门禁 (B1)
+  report_fairness: true                # 最差 UE 速率 / 速率标准差 / Jain 指数 (G2)

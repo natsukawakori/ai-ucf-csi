@@ -1,0 +1,8 @@
+# 运行时依赖（Python 3.10+）
+torch>=2.2
+numpy>=1.26
+scipy>=1.11
+matplotlib>=3.8
+thop>=0.1.1
+
+# 数据集：DeepMIMO O1_3p5（从其官网获取），本项目不随仓库分发

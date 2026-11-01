@@ -1,0 +1,34 @@
+# smoke 配置：只用于"跑通代码"，不得用于任何性能结论。
+#
+# 继承 configs/cf_main.yaml 的字段名；未写出的键回落到 generate_cf.py 的默认值。
+# 与主配置的差别只有规模，L/K/S 保持 K*S = 16 = 2L 以免误用退化配置。
+
+project_version: v2.0
+seed: 0
+
+system:
+  ap_count: 8
+  ue_count: 8
+  antennas_per_ap: 4
+  subcarriers: 32
+  candidate_count: 4
+  serving_count: 2
+
+data:
+  train_scenes: 4
+  val_scenes: 2
+  test_scenes: 2
+  snapshots_per_scene: 5
+  ap_layout: regular
+  area_m: [200, 200]
+  ap_height_m: 6.0
+  ue_height_m: 1.5
+  min_distance_m: 5.0
+  pathloss_model: "40+30log10(d)"
+  shadowing_std_db: 4.0
+  resample_shadowing_per_scene: true
+  carrier_hz: 3.5e9
+  bandwidth_hz: 10000000
+  path_count: 4
+  delay_spread_s: 0.5e-6
+  decay_constant_s: 0.15e-6
